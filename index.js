@@ -1,7 +1,9 @@
 var forEach = require('lodash/collection/forEach');
 var filter = require('lodash/collection/filter');
+var reduce = require('lodash/collection/reduce');
 var trim = require('lodash/string/trim');
 var isEmpty = require('lodash/lang/isEmpty');
+var isString = require('lodash/lang/isString');
 var isUndefined = require('lodash/lang/isUndefined');
 var first = require('lodash/array/first');
 var startsWith = require('lodash/string/startsWith');
@@ -17,7 +19,9 @@ var _ = {
   isEmpty: isEmpty,
   first: first,
   startsWith: startsWith,
-  isUndefined: isUndefined
+  isUndefined: isUndefined,
+  reduce: reduce,
+  isString: isString
 };
 
 function parseClass(string) {
@@ -34,23 +38,31 @@ function parseClass(string) {
 
   if (/^\.|#/.test(_.first(parsed))) {
     element = document.createElement('div');
+    parsed.unshift(element);
   }
 
-  _.forEach(parsed, function(value) {
-    var name = value.substring(1, value.length);
+  return parsed
+    .map(function(value) {
+      if (_.isUndefined(element)) {
+        element = document.createElement(value);
+        return element;
+      }
+      return value;
+    })
+    .reduce(function(prev, next) {
+      var element = prev;
+      var value = next;
+      var name = value.substring(1, value.length);
 
-    if (_.isUndefined(element)) {
-      element = document.createElement(value);
-    }
-    else if (_.startsWith(value, '.')) {
-      ClassList(element).add(name);
-    }
-    else if (_.startsWith(value, '#')) {
-      element.setAttribute('id', name);
-    }
-  });
+      if (_.startsWith(value, '.')) {
+        ClassList(element).add(name);
+      }
+      else if (_.startsWith(value, '#')) {
+        element.setAttribute('id', name);
+      }
 
-  return element;
+      return element;
+    });
 }
 
 
@@ -59,118 +71,152 @@ function context () {
   var cleanupFuncs = []
 
   function h() {
-    var args = [].slice.call(arguments);
+    var args = ([].slice.call(arguments)).map(function(x) {
+      return _.isString(x) ? _.trim(x) : x;
+    });
+
     var element = undefined;
 
-    function item (l) {
-      var r
+    console.log('the args', args);
 
-      if (l == null) {
-        return;
+    return args.map(function createElement(argument) {
+      //console.log('we have element', argument, element);
+      if (_.isString(argument) && _.isUndefined(element)) {
+        element = parseClass(argument);
+        return element;
       }
+      return argument;
 
-      else if ('string' === typeof l) {
-        if (_.isUndefined(element)) {
-          element = parseClass(l)
-        }
-        else {
-          element.appendChild(r = document.createTextNode(l))
-        }
-      }
+    }).reduce(function reducer(prev, next) {
+      var element = prev;
+      var node = undefined;
 
-      else if ('number' === typeof l
-        || 'boolean' === typeof l
-        || l instanceof Date
-        || l instanceof RegExp ) {
-          element.appendChild(r = document.createTextNode(l.toString()))
+      if (_.isString(next)) {
+        console.log('the _.isString(next)', next);
+        var textNode = node = document.createTextNode(next);
+        element.appendChild(textNode);
       }
 
-      //there might be a better way to handle this...
-      else if (isArray(l)) {
-        forEach(l, item)
-      }
-      else if (isNode(l)) {
-        element.appendChild(r = l)
-      }
-      else if (l instanceof Text) {
-        element.appendChild(r = l)
+      else if ('number' === typeof next
+        || 'boolean' === typeof next
+        || next instanceof Date
+        || next instanceof RegExp ) {
+        console.log('the _.isBoolean(next)...', next);
+        var textNode = node = document.createTextNode(String(next));
+        element.appendChild(textNode);
       }
 
-      else if ('object' === typeof l) {
-        for (var k in l) {
-          if ('function' === typeof l[k]) {
-            if (/^on\w+/.test(k)) {
-              (function (k, l) { // capture k, l in the closure
-                if (element.addEventListener){
-                  element.addEventListener(k.substring(2), l[k], false)
+      else if (isArray(next)) {
+        console.log('found arr', next);
+        _.forEach(next, function(v) {
+          element.appendChild(v);
+        });
+      }
+
+      else if (isNode(next)) {
+        console.log('the isNode(next)', next);
+        node = next;
+        element.appendChild(next);
+      }
+      else if (next instanceof Text) {
+        console.log('the instance of Text', next);
+        node = next;
+        element.appendChild(next)
+      }
+
+      else if ('object' === typeof next) {
+        console.log('the _.isObject(next)', next);
+
+        _.forEach(next, function(value, key) {
+
+          if ('function' === typeof value) {
+            if (/^on\w+/.test(key)) {
+
+              // capture k, l in the closure
+              (function (key, value) {
+                if (element.addEventListener) {
+                  element.addEventListener(key.substring(2), value, false);
+
                   cleanupFuncs.push(function(){
-                    element.removeEventListener(k.substring(2), l[k], false)
-                  })
+                    element.removeEventListener(key.substring(2), value, false);
+                  });
                 }
+                // ie<=8
                 else {
-                  element.attachEvent(k, l[k])
-                  cleanupFuncs.push(function(){
-                    element.detachEvent(k, l[k])
-                  })
+                  element.attachEvent(key, value);
+
+                  cleanupFuncs.push(function() {
+                    element.detachEvent(key, value);
+                  });
                 }
-              })(k, l)
+              })(key, value);
             }
             else {
               // observable
-              element[k] = l[k]()
-              cleanupFuncs.push(l[k](function (v) {
-                element[k] = v
-              }))
+              element[key] = value();
+
+              cleanupFuncs.push(value(function(v) {
+                element[key] = v;
+              }));
             }
           }
-          else if (k === 'style') {
-            if ('string' === typeof l[k]) {
-              element.style.cssText = l[k]
-            } else {
-              for (var s in l[k]) (function(s, v) {
-                if('function' === typeof v) {
-                  // observable
-                  element.style.setProperty(s, v())
-                  cleanupFuncs.push(v(function (val) {
-                    element.style.setProperty(s, val)
-                  }))
-                }
-                else {
-                  element.style.setProperty(s, l[k][s])
-                }
-              })(s, l[k][s])
+
+          else if (key === 'style') {
+            if ('string' === typeof value) {
+              element.style.cssText = value;
+            }
+            else {
+              console.log('set style', value);
+              _.forEach(value, function(propValue, propKey) {
+                console.log('the style object key::', propKey, 'the value', propValue);
+                (function(key, value) {
+                  if('function' === typeof value) {
+                    // observable
+                    element.style.setProperty(key, value());
+
+                    cleanupFuncs.push(value(function(val) {
+                      element.style.setProperty(key, val)
+                    }));
+                  }
+                  else {
+                    element.style.setProperty(key, value);
+                  }
+                }(propKey, propValue));
+              });
             }
           }
-          else if (k.substr(0, 5) === "data-") {
-            element.setAttribute(k, l[k])
+
+          else if (key.substr(0, 5) === 'data-') {
+            element.setAttribute(key, value);
           }
           else {
-            element[k] = l[k]
+            element[key] = value;
           }
-        }
+        });
 
       }
-      else if ('function' === typeof l) {
+
+      else if ('function' === typeof next) {
         //assume it's an observable!
-        var v = l()
-        element.appendChild(r = isNode(v) ? v : document.createTextNode(v))
+        var value = next()
+        var nodeValue = isNode(value) ? value : document.createTextNode(value);
+        node = nodeValue;
+        element.appendChild(nodeValue);
 
-        cleanupFuncs.push(l(function (v) {
-          if(isNode(v) && r.parentElement)
-            r.parentElement.replaceChild(v, r), r = v
-          else
-            r.textContent = v
-        }))
+        cleanupFuncs.push(next(function(v) {
+          if (isNode(v) && node.parentElement) {
+            node.parentElement.replaceChild(v, node);
+            node = v;
+          }
+          else {
+            node.textContent = v;
+          }
+        }));
       }
 
-      return r
-    }
-
-    while (args.length) {
-      item(args.shift())
-    }
-
-    return element;
+      console.log('we finished', element);
+      return element;
+    });
   }
 
   h.cleanup = function () {
