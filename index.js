@@ -2,6 +2,7 @@ var forEach = require('lodash/collection/forEach');
 var filter = require('lodash/collection/filter');
 var trim = require('lodash/string/trim');
 var isEmpty = require('lodash/lang/isEmpty');
+var isUndefined = require('lodash/lang/isUndefined');
 var first = require('lodash/array/first');
 var startsWith = require('lodash/string/startsWith');
 
@@ -15,7 +16,8 @@ var _ = {
   trim: trim,
   isEmpty: isEmpty,
   first: first,
-  startsWith: startsWith
+  startsWith: startsWith,
+  isUndefined: isUndefined
 };
 
 function parseClass(string) {
@@ -37,7 +39,7 @@ function parseClass(string) {
   _.forEach(parsed, function(value) {
     var name = value.substring(1, value.length);
 
-    if (!element) {
+    if (_.isUndefined(element)) {
       element = document.createElement(value);
     }
     else if (_.startsWith(value, '.')) {
@@ -63,45 +65,57 @@ function context () {
     function item (l) {
       var r
 
-      if(l == null)
-        ;
-      else if('string' === typeof l) {
-        if(!element)
-          element = parseClass(l)
-        else
-          element.appendChild(r = document.createTextNode(l))
+      if (l == null) {
+        return;
       }
-      else if('number' === typeof l
+
+      else if ('string' === typeof l) {
+        if (_.isUndefined(element)) {
+          element = parseClass(l)
+        }
+        else {
+          element.appendChild(r = document.createTextNode(l))
+        }
+      }
+
+      else if ('number' === typeof l
         || 'boolean' === typeof l
         || l instanceof Date
         || l instanceof RegExp ) {
           element.appendChild(r = document.createTextNode(l.toString()))
       }
+
       //there might be a better way to handle this...
-      else if (isArray(l))
+      else if (isArray(l)) {
         forEach(l, item)
-      else if(isNode(l))
+      }
+      else if (isNode(l)) {
         element.appendChild(r = l)
-      else if(l instanceof Text)
+      }
+      else if (l instanceof Text) {
         element.appendChild(r = l)
+      }
+
       else if ('object' === typeof l) {
         for (var k in l) {
-          if('function' === typeof l[k]) {
-            if(/^on\w+/.test(k)) {
+          if ('function' === typeof l[k]) {
+            if (/^on\w+/.test(k)) {
               (function (k, l) { // capture k, l in the closure
                 if (element.addEventListener){
                   element.addEventListener(k.substring(2), l[k], false)
                   cleanupFuncs.push(function(){
                     element.removeEventListener(k.substring(2), l[k], false)
                   })
-                }else{
+                }
+                else {
                   element.attachEvent(k, l[k])
                   cleanupFuncs.push(function(){
                     element.detachEvent(k, l[k])
                   })
                 }
               })(k, l)
-            } else {
+            }
+            else {
               // observable
               element[k] = l[k]()
               cleanupFuncs.push(l[k](function (v) {
@@ -109,10 +123,10 @@ function context () {
               }))
             }
           }
-          else if(k === 'style') {
-            if('string' === typeof l[k]) {
+          else if (k === 'style') {
+            if ('string' === typeof l[k]) {
               element.style.cssText = l[k]
-            }else{
+            } else {
               for (var s in l[k]) (function(s, v) {
                 if('function' === typeof v) {
                   // observable
@@ -120,17 +134,23 @@ function context () {
                   cleanupFuncs.push(v(function (val) {
                     element.style.setProperty(s, val)
                   }))
-                } else
+                }
+                else {
                   element.style.setProperty(s, l[k][s])
+                }
               })(s, l[k][s])
             }
-          } else if (k.substr(0, 5) === "data-") {
+          }
+          else if (k.substr(0, 5) === "data-") {
             element.setAttribute(k, l[k])
-          } else {
+          }
+          else {
             element[k] = l[k]
           }
         }
-      } else if ('function' === typeof l) {
+
+      }
+      else if ('function' === typeof l) {
         //assume it's an observable!
         var v = l()
         element.appendChild(r = isNode(v) ? v : document.createTextNode(v))
@@ -145,8 +165,10 @@ function context () {
 
       return r
     }
-    while(args.length)
+
+    while (args.length) {
       item(args.shift())
+    }
 
     return element;
   }
