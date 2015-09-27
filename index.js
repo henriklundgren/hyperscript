@@ -1,6 +1,56 @@
+var forEach = require('lodash/collection/forEach');
+var filter = require('lodash/collection/filter');
+var trim = require('lodash/string/trim');
+var isEmpty = require('lodash/lang/isEmpty');
+var first = require('lodash/array/first');
+var startsWith = require('lodash/string/startsWith');
+
 var split = require('browser-split')
 var ClassList = require('class-list')
 require('html-element')
+
+var _ = {
+  forEach: forEach,
+  filter: filter,
+  trim: trim,
+  isEmpty: isEmpty,
+  first: first,
+  startsWith: startsWith
+};
+
+function parseClass(string) {
+  'use strict';
+  var element = undefined;
+
+  // Our minimal parser doesn’t understand escaping CSS special
+  // characters like `#`. Don’t use them. More reading:
+  // https://mathiasbynens.be/notes/css-escapes .
+
+  var parsed = _.filter(split(_.trim(string), /([\.#]?[^\s#.]+)/), function(v) {
+    return !_.isEmpty(v);
+  });
+
+  if (/^\.|#/.test(_.first(parsed))) {
+    element = document.createElement('div');
+  }
+
+  _.forEach(parsed, function(value) {
+    var name = value.substring(1, value.length);
+
+    if (!element) {
+      element = document.createElement(value);
+    }
+    else if (_.startsWith(value, '.')) {
+      ClassList(element).add(name);
+    }
+    else if (_.startsWith(value, '#')) {
+      element.setAttribute('id', name);
+    }
+  });
+
+  return element;
+}
+
 
 function context () {
 
@@ -10,31 +60,12 @@ function context () {
     var args = [].slice.call(arguments), e = null
     function item (l) {
       var r
-      function parseClass (string) {
-        // Our minimal parser doesn’t understand escaping CSS special
-        // characters like `#`. Don’t use them. More reading:
-        // https://mathiasbynens.be/notes/css-escapes .
-
-        var m = split(string, /([\.#]?[^\s#.]+)/)
-        if(/^\.|#/.test(m[1]))
-          e = document.createElement('div')
-        forEach(m, function (v) {
-          var s = v.substring(1,v.length)
-          if(!v) return
-          if(!e)
-            e = document.createElement(v)
-          else if (v[0] === '.')
-            ClassList(e).add(s)
-          else if (v[0] === '#')
-            e.setAttribute('id', s)
-        })
-      }
 
       if(l == null)
         ;
       else if('string' === typeof l) {
         if(!e)
-          parseClass(l)
+          e = parseClass(l)
         else
           e.appendChild(r = document.createTextNode(l))
       }
@@ -139,10 +170,10 @@ function isText (el) {
   return el && el.nodeName === '#text' && el.nodeType == 3
 }
 
-function forEach (arr, fn) {
+/*function forEach (arr, fn) {
   if (arr.forEach) return arr.forEach(fn)
   for (var i = 0; i < arr.length; i++) fn(arr[i], i)
-}
+}*/
 
 function isArray (arr) {
   return Object.prototype.toString.call(arr) == '[object Array]'
