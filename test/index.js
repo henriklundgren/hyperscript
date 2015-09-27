@@ -48,8 +48,9 @@ test('can default element types', function(t){
 })
 
 test('can set properties', function(t){
-  var a = h('a', {href: 'http://google.com'})
-  t.equal(a.href, 'http://google.com/')
+  var a = h('a', { href: 'http://google.com/' });
+  t.equal(a.href, 'http://google.com/');
+
   var checkbox = h('input', {name: 'yes', type: 'checkbox'})
   t.equal(checkbox.outerHTML, '<input name="yes" type="checkbox">')
   t.end()
@@ -59,7 +60,7 @@ test('registers event handlers', function(t){
   var onClick = spy()
   var p = h('p', {onclick: onClick}, 'something')
   simu.click(p)
-  t.assert(onClick.called)
+  t.assert(onClick.called, 'eventhandler called')
   t.end()
 })
 
@@ -83,7 +84,7 @@ test('sets data attributes', function(t){
 
 test('boolean, number, date, regex get to-string\'ed', function(t){
   var e = h('p', true, false, 4, new Date('Mon Jan 15 2001'), /hello/)
-  t.assert(e.outerHTML.match(/<p>truefalse4Mon Jan 15.+2001.*\/hello\/<\/p>/))
+  t.assert(e.outerHTML.match(/<p>truefalse4Mon Jan 15.+2001.*\/hello\/<\/p>/), 'coerce values to string')
   t.end()
 })
 
@@ -134,12 +135,16 @@ test('context cleanup removes observable listeners', function(t){
   var className = o()
   className('para')
   var p = _h('p', {style: {color: color}, className: className}, text)
-  t.equal(p.outerHTML, '<p style=\"color: red; \" class=\"para\">hello</p>')
+
+  t.equal(p.style.color, 'red');
+  t.ok(p.classList.contains('para'), 'contains classname');
   _h.cleanup()
   color('blue')
   text('world')
   className('section')
-  t.equal(p.outerHTML, '<p style=\"color: red; \" class=\"para\">hello</p>')
+
+  t.equal(p.style.color, 'red');
+  t.ok(p.classList.contains('para'), 'contains classname');
   t.end()
 })
 

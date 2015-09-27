@@ -77,10 +77,7 @@ function context () {
 
     var element = undefined;
 
-    console.log('the args', args);
-
     return args.map(function createElement(argument) {
-      //console.log('we have element', argument, element);
       if (_.isString(argument) && _.isUndefined(element)) {
         element = parseClass(argument);
         return element;
@@ -92,7 +89,6 @@ function context () {
       var node = undefined;
 
       if (_.isString(next)) {
-        console.log('the _.isString(next)', next);
         var textNode = node = document.createTextNode(next);
         element.appendChild(textNode);
       }
@@ -101,34 +97,28 @@ function context () {
         || 'boolean' === typeof next
         || next instanceof Date
         || next instanceof RegExp ) {
-        console.log('the _.isBoolean(next)...', next);
         var textNode = node = document.createTextNode(String(next));
         element.appendChild(textNode);
       }
 
       else if (isArray(next)) {
-        console.log('found arr', next);
         _.forEach(next, function(v) {
           element.appendChild(v);
         });
       }
 
       else if (isNode(next)) {
-        console.log('the isNode(next)', next);
         node = next;
         element.appendChild(next);
       }
       else if (next instanceof Text) {
-        console.log('the instance of Text', next);
         node = next;
         element.appendChild(next)
       }
 
       else if ('object' === typeof next) {
-        console.log('the _.isObject(next)', next);
 
         _.forEach(next, function(value, key) {
-
           if ('function' === typeof value) {
             if (/^on\w+/.test(key)) {
 
@@ -168,7 +158,6 @@ function context () {
             else {
               console.log('set style', value);
               _.forEach(value, function(propValue, propKey) {
-                console.log('the style object key::', propKey, 'the value', propValue);
                 (function(key, value) {
                   if('function' === typeof value) {
                     // observable
@@ -214,7 +203,6 @@ function context () {
         }));
       }
 
-      console.log('we finished', element);
       return element;
     });
   }
