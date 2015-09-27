@@ -57,81 +57,83 @@ function context () {
   var cleanupFuncs = []
 
   function h() {
-    var args = [].slice.call(arguments), e = null
+    var args = [].slice.call(arguments);
+    var element = undefined;
+
     function item (l) {
       var r
 
       if(l == null)
         ;
       else if('string' === typeof l) {
-        if(!e)
-          e = parseClass(l)
+        if(!element)
+          element = parseClass(l)
         else
-          e.appendChild(r = document.createTextNode(l))
+          element.appendChild(r = document.createTextNode(l))
       }
       else if('number' === typeof l
         || 'boolean' === typeof l
         || l instanceof Date
         || l instanceof RegExp ) {
-          e.appendChild(r = document.createTextNode(l.toString()))
+          element.appendChild(r = document.createTextNode(l.toString()))
       }
       //there might be a better way to handle this...
       else if (isArray(l))
         forEach(l, item)
       else if(isNode(l))
-        e.appendChild(r = l)
+        element.appendChild(r = l)
       else if(l instanceof Text)
-        e.appendChild(r = l)
+        element.appendChild(r = l)
       else if ('object' === typeof l) {
         for (var k in l) {
           if('function' === typeof l[k]) {
             if(/^on\w+/.test(k)) {
               (function (k, l) { // capture k, l in the closure
-                if (e.addEventListener){
-                  e.addEventListener(k.substring(2), l[k], false)
+                if (element.addEventListener){
+                  element.addEventListener(k.substring(2), l[k], false)
                   cleanupFuncs.push(function(){
-                    e.removeEventListener(k.substring(2), l[k], false)
+                    element.removeEventListener(k.substring(2), l[k], false)
                   })
                 }else{
-                  e.attachEvent(k, l[k])
+                  element.attachEvent(k, l[k])
                   cleanupFuncs.push(function(){
-                    e.detachEvent(k, l[k])
+                    element.detachEvent(k, l[k])
                   })
                 }
               })(k, l)
             } else {
               // observable
-              e[k] = l[k]()
+              element[k] = l[k]()
               cleanupFuncs.push(l[k](function (v) {
-                e[k] = v
+                element[k] = v
               }))
             }
           }
           else if(k === 'style') {
             if('string' === typeof l[k]) {
-              e.style.cssText = l[k]
+              element.style.cssText = l[k]
             }else{
               for (var s in l[k]) (function(s, v) {
                 if('function' === typeof v) {
                   // observable
-                  e.style.setProperty(s, v())
+                  element.style.setProperty(s, v())
                   cleanupFuncs.push(v(function (val) {
-                    e.style.setProperty(s, val)
+                    element.style.setProperty(s, val)
                   }))
                 } else
-                  e.style.setProperty(s, l[k][s])
+                  element.style.setProperty(s, l[k][s])
               })(s, l[k][s])
             }
           } else if (k.substr(0, 5) === "data-") {
-            e.setAttribute(k, l[k])
+            element.setAttribute(k, l[k])
           } else {
-            e[k] = l[k]
+            element[k] = l[k]
           }
         }
       } else if ('function' === typeof l) {
         //assume it's an observable!
         var v = l()
-        e.appendChild(r = isNode(v) ? v : document.createTextNode(v))
+        element.appendChild(r = isNode(v) ? v : document.createTextNode(v))
 
         cleanupFuncs.push(l(function (v) {
           if(isNode(v) && r.parentElement)
@@ -146,7 +148,7 @@ function context () {
     while(args.length)
       item(args.shift())
 
-    return e
+    return element;
   }
 
   h.cleanup = function () {
