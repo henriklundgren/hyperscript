@@ -17,6 +17,7 @@ var isRegExp = require('lodash/lang/isRegExp');
 var isArray = require('lodash/lang/isArray');
 var isUndefined = require('lodash/lang/isUndefined');
 
+var modernizr = require('./vendor/modernizr-custom');
 var split = require('browser-split')
 var classList = require('class-list')
 require('html-element')
@@ -72,6 +73,9 @@ function parseClass(string) {
     var name = value.substring(1, value.length);
 
     if (_.startsWith(value, '.')) {
+      if (Modernizr.classList) {
+        return element.classList.add(name);
+      }
       classList(element).add(name);
     }
     else if (_.startsWith(value, '#')) {
@@ -143,7 +147,7 @@ function context () {
 
               // capture k, l in the closure
               (function IIFE(key, value) {
-                if (element.addEventListener) {
+                if (Modernizr.eventlistener) {
                   element.addEventListener(key.substring(2), value, false);
 
                   cleanupFuncs.push(function() {
@@ -194,7 +198,7 @@ function context () {
           }
 
           else if (key.substr(0, 5) === 'data-') {
-            if (element.dataset) {
+            if (Modernizr.dataset) {
               var name = key.substr(5, key.length);
               return element.dataset[name] = value;
             }
