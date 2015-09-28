@@ -2,14 +2,23 @@ var forEach = require('lodash/collection/forEach');
 var filter = require('lodash/collection/filter');
 var reduce = require('lodash/collection/reduce');
 var trim = require('lodash/string/trim');
-var isEmpty = require('lodash/lang/isEmpty');
-var isString = require('lodash/lang/isString');
-var isUndefined = require('lodash/lang/isUndefined');
 var first = require('lodash/array/first');
 var startsWith = require('lodash/string/startsWith');
 
+var isFunction = require('lodash/lang/isFunction');
+var isEmpty = require('lodash/lang/isEmpty');
+var isString = require('lodash/lang/isString');
+var isNumber = require('lodash/lang/isNumber');
+var isBoolean = require('lodash/lang/isBoolean');
+var isObject = require('lodash/lang/isObject');
+var isPlainObject = require('lodash/lang/isPlainObject');
+var isDate = require('lodash/lang/isDate');
+var isRegExp = require('lodash/lang/isRegExp');
+var isArray = require('lodash/lang/isArray');
+var isUndefined = require('lodash/lang/isUndefined');
+
 var split = require('browser-split')
-var ClassList = require('class-list')
+var classList = require('class-list')
 require('html-element')
 
 var _ = {
@@ -21,7 +30,15 @@ var _ = {
   startsWith: startsWith,
   isUndefined: isUndefined,
   reduce: reduce,
-  isString: isString
+  isString: isString,
+  isArray: isArray,
+  isNumber: isNumber,
+  isDate: isDate,
+  isRegExp: isRegExp,
+  isBoolean: isBoolean,
+  isObject: isObject,
+  isFunction: isFunction,
+  isPlainObject: isPlainObject
 };
 
 function parseClass(string) {
@@ -41,28 +58,29 @@ function parseClass(string) {
     parsed.unshift(element);
   }
 
-  return parsed
-    .map(function(value) {
-      if (_.isUndefined(element)) {
-        element = document.createElement(value);
-        return element;
-      }
-      return value;
-    })
-    .reduce(function(prev, next) {
-      var element = prev;
-      var value = next;
-      var name = value.substring(1, value.length);
-
-      if (_.startsWith(value, '.')) {
-        ClassList(element).add(name);
-      }
-      else if (_.startsWith(value, '#')) {
-        element.setAttribute('id', name);
-      }
-
+  function mapper(value) {
+    if (_.isUndefined(element)) {
+      element = document.createElement(value);
       return element;
-    });
+    }
+    return value;
+  }
+
+  function reducer(prev, next) {
+    var element = prev;
+    var value = next;
+    var name = value.substring(1, value.length);
+
+    if (_.startsWith(value, '.')) {
+      classList(element).add(name);
+    }
+    else if (_.startsWith(value, '#')) {
+      element.setAttribute('id', name);
+    }
+    return element;
+  }
+
+  return parsed.map(mapper).reduce(reducer);
 }
 
 
@@ -77,14 +95,15 @@ function context () {
 
     var element = undefined;
 
-    return args.map(function createElement(argument) {
+    function createElement(argument) {
       if (_.isString(argument) && _.isUndefined(element)) {
         element = parseClass(argument);
         return element;
       }
       return argument;
+    }
 
-    }).reduce(function reducer(prev, next) {
+    function reducer(prev, next) {
       var element = prev;
       var node = undefined;
 
@@ -93,15 +112,15 @@ function context () {
         element.appendChild(textNode);
       }
 
-      else if ('number' === typeof next
-        || 'boolean' === typeof next
-        || next instanceof Date
-        || next instanceof RegExp ) {
+      else if (_.isNumber(next)
+        || _.isBoolean(next)
+        || _.isDate(next)
+        || _.isRegExp(next)) {
         var textNode = node = document.createTextNode(String(next));
         element.appendChild(textNode);
       }
 
-      else if (isArray(next)) {
+      else if (_.isArray(next)) {
         _.forEach(next, function(v) {
           element.appendChild(v);
         });
@@ -116,18 +135,18 @@ function context () {
         element.appendChild(next)
       }
 
-      else if ('object' === typeof next) {
+      else if (_.isPlainObject(next)) {
 
-        _.forEach(next, function(value, key) {
-          if ('function' === typeof value) {
+        _.forEach(next, function eachObject(value, key) {
+          if (_.isFunction(value)) {
             if (/^on\w+/.test(key)) {
 
               // capture k, l in the closure
-              (function (key, value) {
+              (function IIFE(key, value) {
                 if (element.addEventListener) {
                   element.addEventListener(key.substring(2), value, false);
 
-                  cleanupFuncs.push(function(){
+                  cleanupFuncs.push(function() {
                     element.removeEventListener(key.substring(2), value, false);
                   });
                 }
@@ -139,7 +158,7 @@ function context () {
                     element.detachEvent(key, value);
                   });
                 }
-              })(key, value);
+              }(key, value));
             }
             else {
               // observable
@@ -152,14 +171,13 @@ function context () {
           }
 
           else if (key === 'style') {
-            if ('string' === typeof value) {
+            if (_.isString(value)) {
               element.style.cssText = value;
             }
             else {
-              console.log('set style', value);
               _.forEach(value, function(propValue, propKey) {
                 (function(key, value) {
-                  if('function' === typeof value) {
+                  if (_.isFunction(value)) {
                     // observable
                     element.style.setProperty(key, value());
 
@@ -185,7 +203,7 @@ function context () {
 
       }
 
-      else if ('function' === typeof next) {
+      else if (_.isFunction(next)) {
         //assume it's an observable!
         var value = next()
         var nodeValue = isNode(value) ? value : document.createTextNode(value);
@@ -202,9 +220,10 @@ function context () {
           }
         }));
       }
-
       return element;
-    });
+    }
+
+    return args.map(createElement).reduce(reducer);
   }
 
   h.cleanup = function () {
@@ -233,6 +252,7 @@ function isText (el) {
   for (var i = 0; i < arr.length; i++) fn(arr[i], i)
 }*/
 
-function isArray (arr) {
+/*function isArray (arr) {
   return Object.prototype.toString.call(arr) == '[object Array]'
-}
+}*/
+
