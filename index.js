@@ -194,6 +194,10 @@ function context () {
           }
 
           else if (key.substr(0, 5) === 'data-') {
+            if (element.dataset) {
+              var name = key.substr(5, key.length);
+              return element.dataset[name] = value;
+            }
             element.setAttribute(key, value);
           }
           else {
